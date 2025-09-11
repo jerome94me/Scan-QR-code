@@ -1,0 +1,662 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>QR Code 掃描器</title>
+
+  <!-- jsQR CDN (a pure JavaScript QR code decoder) -->
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+
+  <style>
+    /* Font and global styles */
+    :root {
+      --bg: #f0f4f7;
+      --card: #ffffff;
+      --accent: #2563eb;
+      --accent-dark: #1e4bb8;
+      --ok: #16a34a;
+      --warn: #f59e0b;
+      --danger: #ef4444;
+      --muted: #6b7280;
+    }
+
+    html, body {
+      height: 100%;
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen",
+        "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue",
+        sans-serif;
+      background: linear-gradient(180deg, var(--bg), #eaf0f6);
+      color: #111827;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 32px auto;
+      background: var(--card);
+      border-radius: 12px;
+      box-shadow: 0 8px 30px rgba(15, 23, 42, 0.08);
+      padding: 22px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    h1 {
+      margin: 0 0 8px 0;
+      font-size: 22px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      margin: 0 0 18px 0;
+      font-size: 13px;
+    }
+
+    .tabs {
+      display: flex;
+      justify-content: space-around;
+      background: #f0f4f7;
+      padding: 6px;
+      border-radius: 10px;
+      margin-bottom: 12px;
+    }
+    
+    .tab {
+      flex: 1;
+      padding: 10px 0;
+      text-align: center;
+      font-weight: 600;
+      border-radius: 8px;
+      cursor: pointer;
+      color: var(--muted);
+      transition: background-color 0.2s ease, color 0.2s ease;
+    }
+
+    .tab.active {
+      background-color: var(--accent);
+      color: white;
+    }
+
+    .tab-content {
+      display: none;
+    }
+    
+    .tab-content.active {
+      display: block;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .btn {
+      padding: 10px 16px;
+      border-radius: 10px;
+      border: none;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      transition: all .12s ease;
+      box-shadow: 0 4px 10px rgba(37, 99, 235, 0.12);
+    }
+
+    .btn:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    .btn-camera {
+      background: linear-gradient(180deg, var(--accent), var(--accent-dark));
+      color: white;
+    }
+
+    .btn-upload {
+      background: linear-gradient(180deg, #10b981, #059669);
+      color: white;
+    }
+    
+    .btn-paste {
+      background: linear-gradient(180deg, #f59e0b, #d97706);
+      color: white;
+    }
+
+    .btn-torch {
+      background: linear-gradient(180deg, #374151, #1f2937);
+      color: white;
+      font-size: 1.2em;
+    }
+    
+    .btn-copy {
+      background: linear-gradient(180deg, #60a5fa, #3b82f6);
+      color: white;
+    }
+
+    .btn-open {
+      background: linear-gradient(180deg, #10b981, #059669);
+      color: white;
+    }
+
+    .btn-generate {
+      background: linear-gradient(180deg, var(--accent), var(--accent-dark));
+      color: white;
+      width: 100%;
+      margin-top: 10px;
+    }
+    
+    .btn-download {
+      background: linear-gradient(180deg, #60a5fa, #3b82f6);
+      color: white;
+      width: 100%;
+      margin-top: 10px;
+    }
+
+    /* Display areas */
+    .content {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 18px;
+    }
+
+    .panel {
+      background: #fbfdff;
+      border-radius: 10px;
+      padding: 14px;
+      min-height: 240px;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    #preview-container {
+      position: relative;
+      width: 100%;
+      height: auto;
+      min-height: 240px;
+      max-height: 500px;
+      overflow: hidden;
+      border-radius: 8px;
+      background: linear-gradient(180deg, #fafafa, #ffffff);
+      border: 1px dashed #e6eef8;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-grow: 1;
+    }
+
+    #camera-feed, #preview-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      border-radius: 8px;
+    }
+
+    .result-box, .record-list {
+      font-size: 14px;
+      padding: 10px;
+      border-radius: 8px;
+      background: #fff;
+      border: 1px solid #eef4fb;
+      min-height: 80px;
+      overflow: auto;
+      white-space: pre-wrap;
+    }
+
+    .hint {
+      color: var(--muted);
+      font-size: 13px;
+      text-align: center;
+    }
+
+    /* Right panel (status/generator/history) */
+    .panel-right {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      align-items: stretch;
+    }
+
+    .status {
+      padding: 10px;
+      border-radius: 8px;
+      font-weight: 700;
+      text-align: center;
+    }
+
+    .status.idle { background: #fff3e0; color: var(--warn); border: 1px solid #fff0c2; }
+    .status.ok { background: #ecfdf5; color: var(--ok); border: 1px solid #bbf7d0; }
+    .status.err { background: #fff1f2; color: var(--danger); border: 1px solid #fecaca; }
+
+    .generator-input {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      font-size: 14px;
+    }
+
+    .qr-placeholder {
+      width: 100%;
+      padding-top: 100%;
+      position: relative;
+    }
+
+    .qr-placeholder::after {
+      content: '輸入文字以生成 QR Code';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: #cbd5e1;
+      font-size: 14px;
+    }
+    
+    .record-item {
+      padding: 8px;
+      border-bottom: 1px solid #eef4fb;
+      cursor: pointer;
+      transition: background-color 0.1s ease;
+      font-size: 14px;
+    }
+
+    .record-item:last-child {
+      border-bottom: none;
+    }
+
+    .record-item:hover {
+      background-color: #f6f9fc;
+    }
+
+    .record-date {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    /* Responsive design */
+    @media (min-width: 768px) {
+      .content {
+        grid-template-columns: 1fr 360px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container" role="main">
+    <h1>📷 QR Code 掃描器</h1>
+    <p class="subtitle">一款輕量級的跨平台 QR Code 掃描與產生工具。</p>
+
+    <div class="tabs">
+      <div class="tab active" data-tab="scanner">掃描器</div>
+      <div class="tab" data-tab="generator">產生器</div>
+      <div class="tab" data-tab="history">紀錄</div>
+    </div>
+    
+    <!-- Scanner Tab -->
+    <div id="scanner" class="tab-content active">
+      <div class="controls">
+        <button id="btnCamera" class="btn btn-camera">📸 開啟相機</button>
+        <button id="btnUpload" class="btn btn-upload">📤 上傳圖片</button>
+        <button id="btnPaste" class="btn btn-paste">📋 貼上圖片</button>
+        <button id="btnTorch" class="btn btn-torch" style="display:none;">💡</button>
+      </div>
+      
+      <div class="content">
+        <div class="panel">
+          <div id="preview-container">
+            <video id="camera-feed" style="display: none;" playsinline></video>
+            <canvas id="preview-canvas"></canvas>
+            <div id="no-camera-text">點擊上方按鈕開始掃描</div>
+          </div>
+          <div class="result-box" id="resultBox">尚無掃描結果。</div>
+        </div>
+      </div>
+      
+      <div class="controls">
+        <button id="btnCopyResult" class="btn btn-copy" disabled>複製結果</button>
+        <button id="btnOpenLink" class="btn btn-open" disabled>在新分頁開啟</button>
+      </div>
+      
+    </div>
+
+    <!-- Generator Tab -->
+    <div id="generator" class="tab-content">
+      <div class="panel">
+        <textarea id="generatorInput" class="generator-input" rows="5" placeholder="輸入文字或網址來生成 QR Code..."></textarea>
+        <canvas id="qrCanvas"></canvas>
+        <a id="downloadLink" class="btn btn-download" style="display:none;">📥 下載 QR Code</a>
+      </div>
+    </div>
+
+    <!-- History Tab -->
+    <div id="history" class="tab-content">
+      <div class="panel">
+        <div id="historyList" class="record-list">
+          <p class="hint" style="text-align:center;">尚無掃描紀錄。</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script>
+    // == UI Elements ==
+    const tabs = document.querySelectorAll('.tab');
+    const tabContents = document.querySelectorAll('.tab-content');
+    const btnCamera = document.getElementById('btnCamera');
+    const btnUpload = document.getElementById('btnUpload');
+    const btnPaste = document.getElementById('btnPaste');
+    const btnTorch = document.getElementById('btnTorch');
+    const btnCopyResult = document.getElementById('btnCopyResult');
+    const btnOpenLink = document.getElementById('btnOpenLink');
+    const cameraFeed = document.getElementById('camera-feed');
+    const previewCanvas = document.getElementById('preview-canvas');
+    const noCameraText = document.getElementById('no-camera-text');
+    const resultBox = document.getElementById('resultBox');
+    const generatorInput = document.getElementById('generatorInput');
+    const qrCanvas = document.getElementById('qrCanvas');
+    const downloadLink = document.getElementById('downloadLink');
+    const historyList = document.getElementById('historyList');
+
+    const ctx = previewCanvas.getContext('2d');
+    let videoStream = null;
+    let qrCodeWorker = null;
+    let lastResult = null;
+    let history = [];
+
+    // == Tab Management ==
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        tabs.forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        tabContents.forEach(c => c.classList.remove('active'));
+        document.getElementById(tab.dataset.tab).classList.add('active');
+        
+        // Stop camera on tab switch
+        if (tab.dataset.tab !== 'scanner') {
+          stopCamera();
+        }
+        
+        // Load history on history tab activation
+        if (tab.dataset.tab === 'history') {
+          renderHistory();
+        }
+      });
+    });
+
+    // == QR Code Scanning Functions ==
+    function isUrl(text) {
+      try {
+        const url = new URL(text);
+        return url.protocol === 'http:' || url.protocol === 'https:';
+      } catch (e) {
+        return false;
+      }
+    }
+
+    async function handleImage(imageBitmap) {
+      stopCamera();
+      
+      const maxWidth = 500, maxHeight = 500;
+      let width = imageBitmap.width, height = imageBitmap.height;
+      const ratio = Math.min(maxWidth / width, maxHeight / height, 1);
+      width = Math.round(width * ratio);
+      height = Math.round(height * ratio);
+      
+      previewCanvas.width = width;
+      previewCanvas.height = height;
+      ctx.clearRect(0, 0, width, height);
+      ctx.drawImage(imageBitmap, 0, 0, width, height);
+
+      const imageData = ctx.getImageData(0, 0, width, height);
+      const code = jsQR(imageData.data, imageData.width, imageData.height);
+      
+      if (code) {
+        updateResult(code.data);
+      } else {
+        updateResult('未偵測到 QR Code。', true);
+      }
+    }
+
+    function updateResult(text, isError = false) {
+      lastResult = text;
+      resultBox.textContent = text;
+      resultBox.style.backgroundColor = isError ? '#fff1f2' : '#ecfdf5';
+      resultBox.style.borderColor = isError ? '#fecaca' : '#bbf7d0';
+      
+      btnCopyResult.disabled = isError || !text;
+      btnOpenLink.disabled = isError || !isUrl(text);
+      
+      if (!isError) {
+        saveToHistory(text);
+      }
+    }
+
+    function saveToHistory(text) {
+      const now = new Date();
+      const timestamp = now.toLocaleDateString() + ' ' + now.toLocaleTimeString();
+      const newRecord = { content: text, timestamp: timestamp };
+      history.unshift(newRecord);
+      localStorage.setItem('qrHistory', JSON.stringify(history));
+      renderHistory();
+    }
+
+    function renderHistory() {
+      historyList.innerHTML = '';
+      if (history.length === 0) {
+        historyList.innerHTML = '<p class="hint" style="text-align:center;">尚無掃描紀錄。</p>';
+        return;
+      }
+      history.forEach((item, index) => {
+        const div = document.createElement('div');
+        div.className = 'record-item';
+        div.innerHTML = `
+          <div>${item.content.substring(0, 50)}...</div>
+          <div class="record-date">${item.timestamp}</div>
+        `;
+        div.addEventListener('click', () => {
+          updateResult(item.content);
+          tabs[0].click(); // Switch to scanner tab
+        });
+        historyList.appendChild(div);
+      });
+    }
+
+    // == Camera Controls ==
+    async function startCamera() {
+      try {
+        videoStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'environment' }
+        });
+        cameraFeed.srcObject = videoStream;
+        cameraFeed.style.display = 'block';
+        previewCanvas.style.display = 'none';
+        noCameraText.style.display = 'none';
+        btnCamera.textContent = '關閉相機';
+        
+        const track = videoStream.getVideoTracks()[0];
+        if ('torch' in track.getCapabilities()) {
+          btnTorch.style.display = 'inline-block';
+        }
+        
+        cameraFeed.play();
+        requestAnimationFrame(tick);
+      } catch (err) {
+        console.error("Error accessing camera:", err);
+        updateResult(`無法開啟相機：${err.message}`, true);
+        stopCamera();
+      }
+    }
+
+    function stopCamera() {
+      if (videoStream) {
+        videoStream.getTracks().forEach(track => track.stop());
+        videoStream = null;
+      }
+      cameraFeed.style.display = 'none';
+      previewCanvas.style.display = 'block';
+      noCameraText.style.display = 'block';
+      btnCamera.textContent = '📸 開啟相機';
+      btnTorch.style.display = 'none';
+      if(qrCodeWorker) {
+        qrCodeWorker.terminate();
+        qrCodeWorker = null;
+      }
+    }
+    
+    // Scan loop
+    function tick() {
+      if (videoStream) {
+        if (cameraFeed.readyState === cameraFeed.HAVE_ENOUGH_DATA) {
+          const width = cameraFeed.videoWidth;
+          const height = cameraFeed.videoHeight;
+          
+          previewCanvas.width = width;
+          previewCanvas.height = height;
+          ctx.drawImage(cameraFeed, 0, 0, width, height);
+
+          const imageData = ctx.getImageData(0, 0, width, height);
+          const code = jsQR(imageData.data, imageData.width, imageData.height, {
+            inversionAttempts: "dontInvert",
+          });
+
+          if (code) {
+            updateResult(code.data);
+          }
+        }
+        requestAnimationFrame(tick);
+      }
+    }
+
+    // == Event Listeners ==
+    btnCamera.addEventListener('click', () => {
+      if (videoStream) {
+        stopCamera();
+      } else {
+        startCamera();
+      }
+    });
+
+    btnUpload.addEventListener('click', () => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          const imageBitmap = await createImageBitmap(file);
+          handleImage(imageBitmap);
+        }
+      };
+      input.click();
+    });
+
+    btnPaste.addEventListener('click', async () => {
+      if (!navigator.clipboard || !navigator.clipboard.read) {
+        updateResult("您的瀏覽器不支援此功能。", true);
+        return;
+      }
+
+      try {
+        const items = await navigator.clipboard.read();
+        for (const item of items) {
+          if (item.types.some(type => type.startsWith('image/'))) {
+            const blob = await item.getType('image/png');
+            const imageBitmap = await createImageBitmap(blob);
+            handleImage(imageBitmap);
+            return;
+          }
+        }
+        updateResult("剪貼簿中沒有偵測到圖片。", true);
+      } catch (err) {
+        updateResult(`讀取剪貼簿失敗：${err.message}`, true);
+      }
+    });
+    
+    btnTorch.addEventListener('click', async () => {
+      if (videoStream) {
+        const track = videoStream.getVideoTracks()[0];
+        try {
+          const capabilities = track.getCapabilities();
+          const torchEnabled = capabilities.torch;
+          if (capabilities.torch) {
+            await track.applyConstraints({
+              advanced: [{ torch: !torchEnabled }]
+            });
+          }
+        } catch (err) {
+          console.error("Torch error:", err);
+        }
+      }
+    });
+
+    btnCopyResult.addEventListener('click', () => {
+      if (lastResult) {
+        navigator.clipboard.writeText(lastResult).then(() => {
+          updateResult("結果已複製到剪貼簿！", false);
+        }).catch(err => {
+          updateResult("複製失敗，請手動複製。", true);
+        });
+      }
+    });
+
+    btnOpenLink.addEventListener('click', () => {
+      if (lastResult && isUrl(lastResult)) {
+        window.open(lastResult, '_blank', 'noopener');
+      }
+    });
+
+    // == QR Code Generator ==
+    const qrCode = new QRCode(qrCanvas, {
+      width: 200,
+      height: 200,
+      colorDark: "#000000",
+      colorLight: "#ffffff",
+      correctLevel: QRCode.CorrectLevel.H
+    });
+
+    generatorInput.addEventListener('input', () => {
+      const text = generatorInput.value.trim();
+      if (text) {
+        qrCode.makeCode(text);
+        downloadLink.style.display = 'block';
+      } else {
+        qrCanvas.getContext('2d').clearRect(0, 0, qrCanvas.width, qrCanvas.height);
+        downloadLink.style.display = 'none';
+      }
+    });
+
+    downloadLink.addEventListener('click', () => {
+      downloadLink.href = qrCanvas.toDataURL("image/png");
+      downloadLink.download = `QR_Code_${new Date().getTime()}.png`;
+    });
+
+    // == Initialization ==
+    document.addEventListener('DOMContentLoaded', () => {
+      const storedHistory = localStorage.getItem('qrHistory');
+      if (storedHistory) {
+        history = JSON.parse(storedHistory);
+      }
+      renderHistory();
+      updateResult('尚無掃描結果。', true);
+    });
+
+  </script>
+</body>
+</html>
