@@ -1,417 +1,292 @@
 <!DOCTYPE html>
-<html lang="zh-Hant">
+<html lang="zh-TW">
 <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
-    <title>手機版 QR Code 掃描器</title>
-    
-    <!-- jsQR CDN (純 JavaScript QR 解碼器) -->
-    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
-
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR碼掃描器</title>
+    <!-- 引入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 jsQR 函式庫 -->
+    <script src="https://cdn.jsdelivr.net/npm/jsqr/dist/jsQR.min.js"></script>
+    <!-- 引入 Inter 字體 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
-        /* 字體與全域色調 */
-        @font-face {
-            font-family: "Microsoft JhengHei Local";
-            src: local("Microsoft JhengHei"), local("微軟正黑體");
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #1a1a1a;
         }
-        :root{
-            --bg: #f5f8fb;
-            --card: #ffffff;
-            --accent: #2563eb;
-            --ok: #16a34a;
-            --warn: #f59e0b;
-            --danger: #ef4444;
-            --muted: #6b7280;
+        #video-container {
+            position: relative;
+            width: 100%;
+            padding-top: 100%; /* 1:1 aspect ratio */
+            overflow: hidden;
+            border-radius: 12px;
         }
-        html,body{
-            height:100%;
-            margin:0;
-            font-family: "Microsoft JhengHei Local", "Microsoft JhengHei", "PingFang TC", "Segoe UI", Roboto, sans-serif;
-            background: var(--bg);
-            color:#111827;
+        #video {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            min-width: 100%;
+            min-height: 100%;
+            width: auto;
+            height: auto;
+            transform: translate(-50%, -50%);
+            object-fit: cover;
         }
-        .container{
-            display:flex;
-            flex-direction:column;
-            height:100%;
-            padding:16px;
-            box-sizing:border-box;
-            max-width:500px;
-            margin:0 auto;
+        #scan-area {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 75%;
+            padding-top: 75%;
+            transform: translate(-50%, -50%);
+            border: 2px solid #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 0 0 1000px rgba(0, 0, 0, 0.5);
         }
-        h1{
-            margin:0 0 4px 0;
-            font-size:24px;
-            text-align: center;
-        }
-        .subtitle{
-            color:var(--muted);
-            margin:0 0 16px 0;
-            font-size:14px;
-            text-align: center;
-        }
-
-        .controls{
-            display:flex;
-            gap:12px;
-            margin-bottom:16px;
-        }
-        .btn{
-            flex:1;
-            padding:12px 16px;
-            border-radius:10px;
-            border: none;
-            cursor:pointer;
-            font-size:16px;
-            font-weight:600;
-            transition:all .2s ease;
-            box-shadow:0 4px 10px rgba(0,0,0,0.1);
-        }
-        .btn:disabled{
-            opacity:0.55;
-            cursor:not-allowed;
-            box-shadow:none;
-        }
-        .btn-camera{
-            background:linear-gradient(180deg,#8b5cf6,#7c3aed);
-            color:white;
-        }
-        .btn-upload {
-            background: linear-gradient(180deg, #2563eb, #1e4bb8);
-            color: white;
-        }
-        .btn-flashlight{
-            background:linear-gradient(180deg,#eab308,#ca8a04);
-            color:white;
-        }
-        .btn-flashlight.on{
-            box-shadow: 0 0 15px rgba(234, 179, 8, 0.6);
-        }
-
-        /* 掃描區塊 */
-        .scan-area {
-            flex-grow:1;
-            position:relative;
-            border-radius:12px;
-            overflow:hidden;
-            box-shadow:0 8px 30px rgba(15,23,42,0.1);
-            background:#000;
-            display:flex;
-            flex-direction:column;
-            align-items:center;
-            justify-content:center;
-        }
-        video#scanner-video {
+        /* 自定義彈出視窗的樣式 */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 100;
+            left: 0;
+            top: 0;
             width: 100%;
             height: 100%;
-            object-fit:cover;
+            background-color: rgba(0, 0, 0, 0.7);
+            justify-content: center;
+            align-items: center;
         }
-        canvas#preview{
-            width:100%;
-            height:100%;
-            object-fit:contain;
+        .modal-content {
+            background-color: #2a2a2a;
+            padding: 24px;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 400px;
+            text-align: center;
+            color: #e5e7eb;
+            animation: fadeIn 0.3s;
         }
-
-        .result-overlay {
-            position:absolute;
-            bottom:0;
-            left:0;
-            right:0;
-            background:rgba(0,0,0,0.6);
-            padding:16px;
-            color:white;
-            transition: transform 0.3s ease-in-out;
-            transform: translateY(100%);
-        }
-        .result-overlay.active {
-            transform: translateY(0);
-        }
-        .result-text {
-            font-size:16px;
-            white-space:pre-wrap;
-        }
-        .status-text {
-            font-size:14px;
-            font-weight:700;
-        }
-        .btn-open{
-            margin-top:10px;
-            background:linear-gradient(180deg,#10b981,#059669);
-            color:white;
-            padding:8px 16px;
-            border-radius:8px;
-            font-size:14px;
-            align-self: flex-start;
-        }
-        .btn-open:disabled{
-            opacity:0.55;
-            cursor:not-allowed;
-        }
-
-        /* 響應式 */
-        @media (orientation: landscape) and (max-width: 900px) {
-            .container {
-                flex-direction: row;
-                justify-content: center;
-                align-items: center;
-                padding: 16px;
-            }
-            .content {
-                flex-grow: 1;
-                max-width: 60%;
-            }
-            .controls {
-                flex-direction: column;
-                margin-left: 16px;
-                flex-shrink: 0;
-            }
-            .subtitle {
-                display: none;
-            }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
         }
     </style>
 </head>
-<body>
-    <div class="container" role="main">
-        <h1>📷 手機版 QR Code 掃描器</h1>
-        <p class="subtitle">將您的相機對準 QR Code，或從相簿中上傳圖片。</p>
+<body class="bg-gray-900 text-gray-100 p-6 flex flex-col items-center min-h-screen">
+    <div class="max-w-md w-full">
+        <h1 class="text-3xl font-bold text-center mb-6 text-yellow-400">QR碼掃描器</h1>
         
-        <div class="controls">
-            <button id="btnCamera" class="btn btn-camera">📸 開啟相機</button>
-            <button id="btnUpload" class="btn btn-upload">📤 上傳圖片</button>
-            <button id="btnFlash" class="btn btn-flashlight" disabled style="display: none;">🔦 手電筒</button>
-        </div>
-        
-        <div class="scan-area">
-            <video id="scanner-video" playsinline></video>
-            <canvas id="preview" style="display: none;"></canvas>
-            <div class="result-overlay" id="resultOverlay">
-                <div id="statusText" class="status-text"></div>
-                <div id="resultText" class="result-text"></div>
-                <button id="btnOpen" class="btn btn-open" disabled>🌐 在新分頁開啟</button>
+        <!-- 主要功能區塊 -->
+        <div id="main-content" class="bg-gray-800 p-6 rounded-2xl shadow-lg flex flex-col items-center transition-all duration-300">
+            <div id="video-container" class="w-full mb-6 relative bg-black rounded-xl">
+                <video id="video" playsinline></video>
+                <div id="scan-area"></div>
             </div>
-            <input type="file" id="fileInput" accept="image/*" style="display:none;" />
+            
+            <div class="w-full space-y-4">
+                <input type="file" id="image-upload" accept="image/*" class="hidden" />
+                <button onclick="document.getElementById('image-upload').click()" class="w-full py-3 px-6 bg-blue-500 hover:bg-blue-600 transition-all text-white font-semibold rounded-lg shadow-md focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-opacity-75">
+                    從圖片掃描
+                </button>
+            </div>
+
+            <!-- 結果顯示區 -->
+            <div id="result-display" class="w-full mt-6 bg-gray-700 p-4 rounded-lg hidden">
+                <p id="result-text" class="text-center font-medium break-words"></p>
+                <div id="action-buttons" class="mt-4 flex flex-col space-y-2">
+                    <!-- 按鈕將由 JavaScript 動態生成 -->
+                </div>
+            </div>
+
+            <!-- 錯誤訊息顯示區 -->
+            <div id="error-message" class="w-full mt-4 p-4 bg-red-500/20 text-red-300 rounded-lg text-sm hidden">
+                <p id="error-text" class="text-center"></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 彈出視窗 UI -->
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <h2 id="modal-title" class="text-xl font-bold mb-2"></h2>
+            <p id="modal-message" class="mb-4"></p>
+            <div id="modal-buttons" class="flex justify-center space-x-4">
+                <button id="modal-ok-button" class="py-2 px-6 bg-blue-500 hover:bg-blue-600 transition-all text-white rounded-lg font-semibold"></button>
+                <button id="modal-cancel-button" class="py-2 px-6 bg-gray-600 hover:bg-gray-500 transition-all text-gray-200 rounded-lg font-semibold">關閉</button>
+            </div>
         </div>
     </div>
 
 <script>
-    // 元件
-    const btnCamera = document.getElementById('btnCamera');
-    const btnUpload = document.getElementById('btnUpload');
-    const btnFlash = document.getElementById('btnFlash');
-    const btnOpen = document.getElementById('btnOpen');
-    const scannerVideo = document.getElementById('scanner-video');
-    const preview = document.getElementById('preview');
-    const fileInput = document.getElementById('fileInput');
-    const resultOverlay = document.getElementById('resultOverlay');
-    const statusText = document.getElementById('statusText');
-    const resultText = document.getElementById('resultText');
+    // 獲取 DOM 元素
+    const video = document.getElementById("video");
+    const resultDisplay = document.getElementById("result-display");
+    const resultText = document.getElementById("result-text");
+    const actionButtons = document.getElementById("action-buttons");
+    const errorMessage = document.getElementById("error-message");
+    const errorText = document.getElementById("error-text");
+    const imageUpload = document.getElementById("image-upload");
+    const videoContainer = document.getElementById("video-container");
 
-    const ctx = preview.getContext && preview.getContext('2d');
-    
-    let videoStream = null;
-    let lastResult = null;
-    let animationFrameId = null;
-    let isCameraActive = false;
-    let isFlashlightOn = false;
+    let stream = null;
+    let scanning = false;
 
-    // Helper: 更新狀態區塊
-    function setStatus(type, text, result = null){
-        let color = '#fff';
-        if(type === 'ok') color = '#bbf7d0';
-        else if(type === 'err') color = '#fecaca';
-        else if(type === 'warn') color = '#fff0c2';
-        
-        statusText.textContent = text;
-        statusText.style.color = color;
-        
-        resultText.textContent = result || '';
-        resultOverlay.classList.toggle('active', !!result);
-        
-        btnOpen.disabled = !isUrl(result);
-    }
+    // 顯示自定義彈出視窗
+    function showModal(title, message, options = { showOk: false, okText: 'OK', onOk: null }) {
+        const modal = document.getElementById('modal');
+        const modalTitle = document.getElementById('modal-title');
+        const modalMessage = document.getElementById('modal-message');
+        const modalOkButton = document.getElementById('modal-ok-button');
+        const modalCancelButton = document.getElementById('modal-cancel-button');
 
-    // 檢查是否為 URL (接受 http/https)
-    function isUrl(text){
-        if (!text) return false;
-        try{
-            const u = new URL(text);
-            return (u.protocol === 'http:' || u.protocol === 'https:');
-        }catch(e){
-            return false;
-        }
-    }
+        modalTitle.textContent = title;
+        modalMessage.textContent = message;
+        modalOkButton.textContent = options.okText;
+        modalOkButton.style.display = options.showOk ? 'inline-block' : 'none';
 
-    // 把 image 或 ImageBitmap 畫到 canvas (會根據大小縮放)
-    function drawImageToCanvas(img){
-        const maxW = 1000, maxH = 720;
-        let w = img.width, h = img.height;
-        const ratio = Math.min(maxW / w, maxH / h, 1);
-        w = Math.round(w * ratio);
-        h = Math.round(h * ratio);
-        preview.width = w;
-        preview.height = h;
-        ctx.clearRect(0,0,preview.width, preview.height);
-        ctx.drawImage(img, 0, 0, w, h);
-    }
-    
-    // 從 canvas 取得影像資料，交給 jsQR 解碼
-    function decodeFromCanvas(){
-        if(!ctx) return null;
-        try {
-            const imageData = ctx.getImageData(0, 0, preview.width, preview.height);
-            const code = jsQR(imageData.data, imageData.width, imageData.height);
-            return code;
-        } catch(e) {
-            console.error("Error getting image data:", e);
-            return null;
-        }
-    }
-
-    // 處理圖片的通用函式
-    async function handleImage(img){
-        stopCamera();
-        scannerVideo.style.display = 'none';
-        preview.style.display = 'block';
-
-        if(img instanceof Blob){
-            img = await createImageBitmap(img);
-        }
-        drawImageToCanvas(img);
-        const code = decodeFromCanvas();
-        if(code){
-            lastResult = code.data;
-            setStatus('ok', '掃描成功 ✅', '掃描結果：\n\n' + lastResult);
+        if (options.onOk) {
+            modalOkButton.onclick = options.onOk;
         } else {
-            lastResult = null;
-            setStatus('err', '未找到 QR Code ❌', '未偵測到可解析的 QR Code。');
+            modalOkButton.onclick = null;
         }
-    }
 
-    // 處理攝影機串流
-    async function startCamera() {
-        try {
-            const constraints = { video: { facingMode: 'environment' } }; // 優先使用後置鏡頭
-            videoStream = await navigator.mediaDevices.getUserMedia(constraints);
-            scannerVideo.srcObject = videoStream;
-            scannerVideo.setAttribute('playsinline', true);
-            await scannerVideo.play();
-            
-            scannerVideo.style.display = 'block';
-            preview.style.display = 'none';
-            
-            const track = videoStream.getVideoTracks()[0];
-            const capabilities = track.getCapabilities();
-            if (capabilities.torch) {
-                btnFlash.style.display = 'block';
-                btnFlash.disabled = false;
-            }
+        modalCancelButton.onclick = () => {
+            modal.style.display = 'none';
+        };
 
-            setStatus('ok', '攝影機已開啟，即時掃描中...');
-            
-            isCameraActive = true;
-            tick();
-
-        } catch (err) {
-            console.error(err);
-            setStatus('err', '無法存取攝影機 ❌', '請確認已授予網站使用攝影機的權限。');
-            btnFlash.disabled = true;
-            btnFlash.style.display = 'none';
-        }
+        modal.style.display = 'flex';
     }
     
-    // 開啟或關閉手電筒
-    async function toggleFlashlight() {
-        if (!videoStream) return;
-        const track = videoStream.getVideoTracks()[0];
-        try {
-            if (isFlashlightOn) {
-                await track.applyConstraints({ advanced: [{ torch: false }] });
-                isFlashlightOn = false;
-                btnFlash.classList.remove('on');
-            } else {
-                await track.applyConstraints({ advanced: [{ torch: true }] });
-                isFlashlightOn = true;
-                btnFlash.classList.add('on');
+    // 隱藏錯誤訊息
+    function hideError() {
+        errorMessage.classList.add('hidden');
+    }
+
+    // 顯示錯誤訊息
+    function displayError(message) {
+        errorText.textContent = message;
+        errorMessage.classList.remove('hidden');
+    }
+
+    // 處理掃描結果
+    function handleResult(result) {
+        if (!result) return;
+        
+        // 停止掃描
+        if (scanning) {
+            scanning = false;
+        }
+
+        resultText.textContent = `掃描結果: ${result.data}`;
+        resultDisplay.classList.remove('hidden');
+        actionButtons.innerHTML = '';
+        hideError();
+
+        // 檢查是否為有效的 URL
+        const isUrl = result.data.startsWith('http://') || result.data.startsWith('https://');
+
+        if (isUrl) {
+            const openButton = document.createElement('button');
+            openButton.textContent = '開啟網頁';
+            openButton.className = 'w-full py-2 px-4 bg-green-500 hover:bg-green-600 transition-all text-white font-semibold rounded-lg shadow-md focus:outline-none focus:ring-2 focus:ring-green-400';
+            openButton.onclick = () => {
+                window.open(result.data, '_blank');
+            };
+            actionButtons.appendChild(openButton);
+        }
+
+        // 顯示結果彈出視窗
+        showModal('掃描成功!', `結果: ${result.data}`, {
+            showOk: isUrl,
+            okText: '開啟網頁',
+            onOk: () => {
+                if (isUrl) {
+                    window.open(result.data, '_blank');
+                    document.getElementById('modal').style.display = 'none';
+                }
             }
-        } catch (err) {
-            console.error("無法控制手電筒:", err);
-            btnFlash.disabled = true;
-            btnFlash.style.display = 'none';
-        }
+        });
     }
 
-    function stopCamera() {
-        if (animationFrameId) {
-            cancelAnimationFrame(animationFrameId);
-            animationFrameId = null;
+    // 啟動相機掃描
+    function startCameraScan() {
+        // 檢查瀏覽器是否支援
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            displayError("您的瀏覽器不支援相機掃描。");
+            return;
         }
-        if (videoStream) {
-            videoStream.getTracks().forEach(track => track.stop());
-            videoStream = null;
-            scannerVideo.srcObject = null;
-        }
-        isCameraActive = false;
-        isFlashlightOn = false;
-        btnFlash.disabled = true;
-        btnFlash.classList.remove('on');
-        btnFlash.style.display = 'none';
+
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+            .then(function(s) {
+                stream = s;
+                video.srcObject = stream;
+                video.setAttribute("playsinline", true); // iOS 相容性
+                video.play();
+                scanning = true;
+                requestAnimationFrame(tick);
+            })
+            .catch(function(err) {
+                displayError("無法啟動相機。請檢查權限設定。");
+            });
     }
 
+    // 連續掃描迴圈
     function tick() {
-        if (scannerVideo.readyState === scannerVideo.HAVE_ENOUGH_DATA) {
-            preview.height = scannerVideo.videoHeight;
-            preview.width = scannerVideo.videoWidth;
-            ctx.drawImage(scannerVideo, 0, 0, preview.width, preview.height);
-            const code = decodeFromCanvas();
+        if (!scanning) return;
+        if (video.readyState === video.HAVE_ENOUGH_DATA) {
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.height = video.videoHeight;
+            canvas.width = video.videoWidth;
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+            const code = jsQR(imageData.data, imageData.width, imageData.height);
 
             if (code) {
-                lastResult = code.data;
-                setStatus('ok', '掃描成功 ✅', '掃描結果：\n\n' + lastResult);
-                stopCamera();
-                return;
+                handleResult(code);
+                return; // 找到結果後停止
             }
         }
-        animationFrameId = requestAnimationFrame(tick);
+        requestAnimationFrame(tick);
     }
     
-    // 按鈕事件
-    btnCamera.addEventListener('click', () => {
-        if (isCameraActive) {
-            stopCamera();
-            btnCamera.textContent = '📸 開啟相機';
-            setStatus('warn', '相機已關閉', '');
-        } else {
-            startCamera();
-            btnCamera.textContent = '⏹ 關閉相機';
-        }
-    });
-    
-    btnUpload.addEventListener('click', () => {
-        fileInput.click();
-        setStatus('warn', '等待上傳圖片...');
-    });
-
-    fileInput.addEventListener('change', (e) => {
+    // 處理圖片上傳
+    imageUpload.addEventListener('change', function(e) {
         const file = e.target.files[0];
-        if (file) {
-            handleImage(file);
-        }
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            const img = new Image();
+            img.onload = function() {
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                context.drawImage(img, 0, 0, img.width, img.height);
+                const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+                const code = jsQR(imageData.data, imageData.width, imageData.height);
+
+                if (code) {
+                    handleResult(code);
+                } else {
+                    displayError('圖片中未找到 QR 碼。');
+                }
+            };
+            img.src = event.target.result;
+        };
+        reader.readAsDataURL(file);
     });
 
-    btnFlash.addEventListener('click', toggleFlashlight);
-
-    btnOpen.addEventListener('click', () => {
-        if(lastResult && isUrl(lastResult)){
-            window.open(lastResult, '_blank', 'noopener');
-        }
-    });
-    
-    // 初始狀態
-    stopCamera();
-    btnCamera.textContent = '📸 開啟相機';
-    setStatus('warn', '請點擊按鈕來開始掃描。', '');
+    // 頁面載入時啟動相機
+    window.onload = function() {
+        startCameraScan();
+    };
 
 </script>
+
 </body>
 </html>
